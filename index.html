@@ -3,6 +3,23 @@
 
 <head>
     <meta charset="UTF-8">
+    <script>
+        // Global Error Handler to catch any loading or runtime errors and display them
+        window.addEventListener('error', function(e) {
+            console.error('Captured Global Error:', e);
+            setTimeout(function() {
+                var loadingText = document.getElementById('loading-text');
+                if (loadingText) {
+                    loadingText.innerHTML = 'ERROR RUNNING GAME:<br><span style="font-size:14px;color:#FF1744;text-transform:none;font-family:monospace;white-space:pre-wrap;">' + e.message + ' (' + (e.filename ? e.filename.split("/").pop() : 'inline') + ':' + e.lineno + ')</span>';
+                }
+                var loadingScreen = document.getElementById('loading-screen');
+                if (loadingScreen) {
+                    loadingScreen.style.opacity = '1';
+                    loadingScreen.classList.remove('hidden');
+                }
+            }, 100);
+        });
+    </script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="description" content="Crowd Runner: Math Masters - Multiply your crowd through math gates!">
     <meta name="theme-color" content="#4A90E2">
@@ -718,7 +735,7 @@
                 <i class="fas fa-running text-game-green loading-run drop-shadow-lg" style="animation-delay: 0.15s"></i>
                 <i class="fas fa-running text-game-gold loading-run drop-shadow-lg" style="animation-delay: 0.3s"></i>
             </div>
-            <div
+            <div id="loading-text"
                 class="font-display text-2xl bg-gradient-to-r from-game-cyan via-game-gold to-game-purple bg-clip-text text-transparent font-bold mb-6 uppercase tracking-widest text-glow">
                 GATHERING CROWD...
             </div>
@@ -729,11 +746,11 @@
     </div>
 
     <!-- Three.js -->
-    <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+    <script src="three.min.js"></script>
     <!-- Tween.js -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/tween.js/23.1.1/tween.umd.js"></script>
+    <script src="tween.umd.js"></script>
     <!-- Game Script -->
-    <script src="game.js"></script>
+    <script src="game.js?v=1.0.4"></script>
 </body>
 
 </html>

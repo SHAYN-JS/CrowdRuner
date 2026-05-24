@@ -1,43 +1,72 @@
 # 🏃‍♂️ Crowd Runner: Math Masters
 
-Crowd Runner — bu ajoyib 3D giperkazual (hyper-casual) mobil uslubidagi o'yin. Asosiy maqsad — matematik darvozalardan o'tish orqali to'dani ko'paytirish, to'siqlardan o'tish va yakuniy bosqichda raqiblarni mag'lub etib g'alaba qozonishdir.
+A high-performance, premium 3D hyper-casual runner game built using **Vanilla JavaScript**, **Three.js**, and **Tailwind CSS**. Experience fluid rendering, advanced powerups, dynamic obstacles, and a responsive upgrades system.
 
 ---
 
-## 📁 Loyiha Arxitekturasi
+## 📁 Loyiha Arxitekturasi / Directory Structure
 
-Loyihaning amaldagi fayllar tizimi va ularning maqsadi:
+Loyiha giperkazual o'yinlar uchun moslashtirilgan bo'lib, aktivlarning yuklanish vaqtini kamaytirish va ishlash tezligini maksimal darajada oshirish uchun yagona sahifali (SPA) dizayn arxitekturasiga asoslangan.
 
 ```text
 CrowdRunner/
-├── index.html                  # O'yinning asosiy sahifasi, menyular va UI elementlari
-├── style.css                   # Premium AAA darajasidagi dizayn, CSS animatsiyalar va stillar
-├── game.js                     # Three.js 3D dvijogi asnosida qurilgan o'yin logikasi barining yuragi
-├── expand.js                   # O'yinga qo'shimcha murakkab mexanika va effektlarni qo'shuvchi skript
-├── PLAY_GAME.bat               # Windows tizimida o'yinni osonlikcha mahalliy serverda ishga tushirish skripti
-├── README.md                   # Ushbu hujjat
-└── Qo'shimcha Hujjatlar/
-    ├── FIXES_APPLIED.md        # O'tmishda to'g'rilangan buglar va o'zgarishlar tarixi
-    ├── VISIBILITY_FIXED.md     # Kadrlar ko'rinishi va vizual rendering bilan bog'liq yechimlar
-    └── UNITY_SCRIPTS.md        # O'yinni kelajakda Unity ga ko'chirish yoki moslashtirish rejalari
+├── index.html                  # O'yin interfeysi, menyular, do'kon va Tailwind stillari
+├── style.css                   # Custom CSS stillar va animatsiyalar
+├── game.js                     # O'yin dvijogi (Three.js), fizika, xotira va pooling tizimi (Yuragi)
+├── expand.js                   # Custom darajalar va o'yin qumdoni (sandbox) moduli
+├── three.min.js                # WebGL 3D vizuallashtirish kutubxonasi (v0.160.0)
+├── tween.umd.js                # Silliq animatsiyalar yaratish dvijogi (v23.1.1)
+├── PLAY_GAME.bat               # Windows tizimida o'yinni local serverda boshlash skripti
+└── README.md                   # Texnik hujjat va arxitektura bo'yicha yo'riqnoma
 ```
 
 ---
 
-## 🛠 Texnologiyalar
+## 🛠 Texnik Arxitektura (Technical Architecture)
 
-Ushbu o'yin veb-brauzerlar uchun yuksak sifatli ishlab chiqilgan bo'lib, o'zida quyidagi texnologiyalarni jamlagan:
-* **HTML5 & Tailwind CSS** – O'yin bosh menyusi, savdo markazi (skinlar) va foydalanuvchi interfeyslari uchun.
-* **Vanilla JavaScript** – Tezkor va optimallashtirilgan o'yin tsikli.
-* **Three.js** – Muammosiz, yuqori sifatli (AAA) 3D grafikalar va modellar ustida ishlash.
-* **Tween.js** – Ajoyib harakatlanish (bounce, float, hover) interpolatsiyalari va moslashuvchan animatsiyalar uchun.
+### 1. Game State Management (`GAME_STATE`)
+O'yindagi barcha dinamik o'zgaruvchilar va 3D obyektlar yagona global holatda boshqariladi:
+* **Legion/To'dani kuzatish:** Faol 3D stickman obyektlari ro'yxati, pool massivlari va to'da soni.
+* **Progression:** Daraja raqami, tangalar, jami tangalar va do'kondan sotib olingan skinlar.
+* **Boshqaruv:** Sichqoncha, klaviatura va mobil sensorli boshqaruv holati.
 
-## 📌 Asosiy Xususiyatlar
-- **Matematik Mexanika:** Darvozalar ustidagi ko'paytirish, qo'shish, ayirish jarayonlari to'da sonini o'zgartiradi.
-- **Kengaytirilgan O'yin Do'koni:** Tangalar yig'ish evaziga vizual jihatdan o'ziga xos skinlarni xarid etish mumkin.
-- **Dinamik Atrof-Muhit:** Kun va tunga almashuvchi ob-havo (yomg'ir, qor tizimlari), harakatlanuvchi arra va ulkan lazer to'siqlari.
+### 2. High-Performance Stickman Pooling System (Odamchalarni qayta ishlash)
+O'yinda minglab odamchalar yaratilishida mobil qurilmalarda sekinlashuv (Garbage Collection lag) yuzaga kelmasligi uchun **Object Pooling Pattern** joriy qilingan:
+* Odamchalar nobud bo'lganda, Three.js sahnasidan butunlay o'chirib tashlanmay, `visible = false` qilinadi va `GAME_STATE.stickmanPool` massiviga joylanadi.
+* Yangi odamchalar kerak bo'lganda (masalan, ko'paytiruvchi darvozadan o'tganda), tizim yangi mesh yaratmasdan, pool ichidan eski stickmanni oladi, rangini sozlaydi va `visible = true` qilib sahnaga qaytaradi.
+* Bu GPU va CPU yuklamasini keskin kamaytirib, 5,000 tagacha odamchani bir vaqtda silliq render qilish imkonini beradi.
 
-## 🚀 Qanday qilib ishga tushirish mumkin?
-1. Windows muhitida o'yinni to'g'ridan-to'g'ri Localhost orqali ochish uchun \`PLAY_GAME.bat\` faylini ikki marta bosing.
-2. Yoki **Live Server** dasturidan foydalanib `index.html` faylini brauzeringizda ochishingiz ham mumkin.
-3. Klaviaturadagi (W, A, S, D yoki strelkalar) yordamida personajlarni boshqaring hamda sarguzashtdan rohatlaning!
+### 3. Procedural Level Generation (Tasodifiy darajalar yaratish)
+Darajalar o'yinchi darajasidan kelib chiqib avtomatik shakllantiriladi:
+* **Uzunlik:** Daraja oshgan sari yo'lak uzunligi `150 + currentLevel * 10` ko'rinishida o'sadi.
+* **To'siqlar:** Arralar, aylanuvchi bolta va maydonlar, lazer to'siqlari va dushman askarlari tasodifiy taqsimlanadi.
+* **Matematik Darvozalar:** Matematik amallar (`+`, `x`, `-`, `/`) tasodifiy joylashtirilib, legion sonini o'zgartiradi.
+
+### 4. GPU VRAM Memory Management (Xotirani tozalash)
+O'yinda xotira sizib chiqishi (Memory Leak) va vaqt o'tishi bilan o'yin qotishining oldi olingan:
+* O'yinchi ortda qoldirgan darvozalar va modellar Three.js sahnasidan o'chiriladi.
+* Yangi daraja boshlanganda, eski modellarning barcha 3D geometriya, material hamda teksturalari `traverse(disposeNode)` orqali GPU xotirasidan butunlay tozalanadi (`dispose`).
+
+---
+
+## 🚀 Ishga Tushirish (Quick Start)
+
+### Mahalliy server orqali ishlatish:
+O'yin mahalliy fayllarni brauzerda CORS xatoligisiz to'g'ri yuklashi uchun local serverda ishlashi lozim.
+
+#### 1-usul: Bat skript (Windows uchun eng oson)
+Loyiha jildidagi `PLAY_GAME.bat` faylini ikki marta bosing. U avtomatik tarzda brauzerni ishga tushiradi.
+
+#### 2-usul: Python HTTP Server (Tavsiya etilgan)
+Terminalda loyiha jildiga kiring va quyidagi buyruqni bosing:
+```powershell
+python -m http.server 8000
+```
+So'ng brauzerda: `http://localhost:8000` manzilini oching.
+
+---
+
+## 🎮 Boshqaruv elementlari (Controls)
+* **Klaviatura:** `W`, `A`, `S`, `D` yoki **Strelkalar** yordamida legionni boshqaring.
+* **Sichqoncha/Touch:** Ekran bo'ylab surish orqali to'dani o'ngga yoki chamga yo'naltiring.
+* **Maqsad:** Yashil darvozalardan o'tib legion sonini ko'paytirish, to'siqlardan qochish va yakuniy Bossni mag'lub etib eng yuqori bonus tangalarni to'plash!

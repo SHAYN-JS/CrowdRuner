@@ -1399,12 +1399,13 @@ function updateObstacles(delta) {
     });
 
     // Collectibles
-    GAME_STATE.collectibles.forEach((item, index) => {
+    for (let i = GAME_STATE.collectibles.length - 1; i >= 0; i--) {
+        const item = GAME_STATE.collectibles[i];
         item.rotation.y += delta * 2;
 
-        GAME_STATE.stickmen.forEach(s => {
+        for (let j = 0; j < GAME_STATE.stickmen.length; j++) {
+            const s = GAME_STATE.stickmen[j];
             if (s.position.distanceTo(item.position) < 1.5) {
-                
                 if (item.userData.type === 'coin') {
                     GAME_STATE.levelCoins += 5;
                     GAME_STATE.coins += 5;
@@ -1413,13 +1414,15 @@ function updateObstacles(delta) {
                 }
 
                 scene.remove(item);
-                GAME_STATE.collectibles.splice(index, 1);
+                GAME_STATE.collectibles.splice(i, 1);
+                break;
             }
-        });
-    });
+        }
+    }
 
     // Enemy Combat
-    GAME_STATE.enemies.forEach((enemyCrew, eIdx) => {
+    for (let i = GAME_STATE.enemies.length - 1; i >= 0; i--) {
+        const enemyCrew = GAME_STATE.enemies[i];
         const overlapping = GAME_STATE.stickmen.filter(s => s.position.distanceTo(enemyCrew.position) < 2.5);
 
         overlapping.forEach(playerStickman => {
@@ -1433,9 +1436,9 @@ function updateObstacles(delta) {
 
         if (enemyCrew.children.length === 0) {
             scene.remove(enemyCrew);
-            GAME_STATE.enemies.splice(eIdx, 1);
+            GAME_STATE.enemies.splice(i, 1);
         }
-    });
+    }
 
     // Boss
     
@@ -1470,9 +1473,6 @@ function updateObstacles(delta) {
         }
 
         if (GAME_STATE.boss.userData.hp <= 0) defeatBoss();
-    }
-
-        });
     }
 }
 
@@ -1554,8 +1554,11 @@ function activatePowerup(type) {
         });
     } else if (type === 'MAGNET') {
         // Collect all coins currently active
-        GAME_STATE.collectibles.forEach(c => {
+        for (let i = GAME_STATE.collectibles.length - 1; i >= 0; i--) {
+            const c = GAME_STATE.collectibles[i];
             if (c.userData.type === 'coin') {
+                // Remove from the collectibles array immediately to prevent double collection
+                GAME_STATE.collectibles.splice(i, 1);
                 new TWEEN.Tween(c.position).to({
                     x: GAME_STATE.playerX,
                     y: 1.0,
@@ -1564,12 +1567,14 @@ function activatePowerup(type) {
                     GAME_STATE.levelCoins += 5;
                     GAME_STATE.coins += 5;
                     scene.remove(c);
+                    c.geometry.dispose();
+                    c.material.dispose();
                 }).start();
             }
-        });
+        }
     } else if (type === 'GIANT') {
         GAME_STATE.stickmen.forEach(s => {
-            new TWEEN.Tween(s.scale).to({x:2, y:2, z:2}, 500).yoyo(true).repeat(1).delay(0).start();
+            new TWEEN.Tween(s.scale).to({x:2, y:2, z:2}, 500).start();
             setTimeout(() => {
                 new TWEEN.Tween(s.scale).to({x:1, y:1, z:1}, 500).start();
             }, 8000);
@@ -1581,11 +1586,33 @@ function activatePowerup(type) {
 // AAA LEVEL GENERATION LOGIC - EXPERT TIER
 // --------------------------------------------------------------------------------------
 
+function disposeNode(node) {
+    if (node.geometry) node.geometry.dispose();
+    if (node.material) {
+        if (Array.isArray(node.material)) {
+            node.material.forEach(m => {
+                if (m.map) m.map.dispose();
+                m.dispose();
+            });
+        } else {
+            if (node.material.map) node.material.map.dispose();
+            node.material.dispose();
+        }
+    }
+}
+
+function safeRemoveAndDispose(array) {
+    array.forEach(obj => {
+        scene.remove(obj);
+        obj.traverse(disposeNode);
+    });
+}
+
 function generateLevel() {
-    GAME_STATE.gates.forEach(g => scene.remove(g));
-    GAME_STATE.obstacles.forEach(o => scene.remove(o));
-    GAME_STATE.enemies.forEach(e => scene.remove(e));
-    GAME_STATE.collectibles.forEach(c => scene.remove(c));
+    safeRemoveAndDispose(GAME_STATE.gates);
+    safeRemoveAndDispose(GAME_STATE.obstacles);
+    safeRemoveAndDispose(GAME_STATE.enemies);
+    safeRemoveAndDispose(GAME_STATE.collectibles);
     GAME_STATE.gates = [];
     GAME_STATE.obstacles = [];
     GAME_STATE.enemies = [];
@@ -1651,8 +1678,69 @@ function createBoss(z) {
     body.castShadow = true;
     group.add(body);
 
+    // HP Bar UI
+    const hpBgMat = new THREE.MeshBasicMaterial({ color: 0x212121, transparent: true, opacity: 0.7 });
+    const hpBg = new THREE.Mesh(new THREE.BoxGeometry(10, 0.4, 0.1), hpBgMat);
+    hpBg.position.set(0, 10.5, 0);
+    group.add(hpBg);
+
+    const hpBarMat = new THREE.MeshBasicMaterial({ color: 0x00E676 });
+    const hpBar = new THREE.Mesh(new THREE.BoxGeometry(9.8, 0.28, 0.12), hpBarMat);
+    hpBar.position.set(0, 10.5, 0.01);
+    group.add(hpBar);
+
+    // Choose subtype
+    const subtype = CONFIG.bossTypes[Math.floor(Math.random() * CONFIG.bossTypes.length)].toLowerCase();
+
     group.position.set(0, 0, z);
-    group.userData = { type: 'boss', hp: 100 + (GAME_STATE.currentLevel * 50) };
+    const maxHp = 100 + (GAME_STATE.currentLevel * 50);
+    group.userData = { 
+        type: 'boss', 
+        subtype: subtype,
+        hp: maxHp, 
+        maxHp: maxHp,
+        hpBar: hpBar 
+    };
+
+    if (subtype === 'dragon') {
+        const lWingPivot = new THREE.Group();
+        lWingPivot.position.set(-1.2, 5, 0);
+        const lWingMesh = new THREE.Mesh(new THREE.BoxGeometry(3, 0.1, 1.5), mat);
+        lWingMesh.position.set(-1.5, 0, 0);
+        lWingMesh.castShadow = true;
+        lWingPivot.add(lWingMesh);
+        group.add(lWingPivot);
+
+        const rWingPivot = new THREE.Group();
+        rWingPivot.position.set(1.2, 5, 0);
+        const rWingMesh = new THREE.Mesh(new THREE.BoxGeometry(3, 0.1, 1.5), mat);
+        rWingMesh.position.set(1.5, 0, 0);
+        rWingMesh.castShadow = true;
+        rWingPivot.add(rWingMesh);
+        group.add(rWingPivot);
+
+        group.userData.lWing = lWingPivot;
+        group.userData.rWing = rWingPivot;
+    } else {
+        const armLeftPivot = new THREE.Group();
+        armLeftPivot.position.set(-1.5, 5, 0);
+        const armLeftMesh = new THREE.Mesh(new THREE.CapsuleGeometry(0.4, 2, 4, 8), mat);
+        armLeftMesh.position.y = -1;
+        armLeftMesh.castShadow = true;
+        armLeftPivot.add(armLeftMesh);
+        group.add(armLeftPivot);
+
+        const armRightPivot = new THREE.Group();
+        armRightPivot.position.set(1.5, 5, 0);
+        const armRightMesh = new THREE.Mesh(new THREE.CapsuleGeometry(0.4, 2, 4, 8), mat);
+        armRightMesh.position.y = -1;
+        armRightMesh.castShadow = true;
+        armRightPivot.add(armRightMesh);
+        group.add(armRightPivot);
+
+        group.userData.armLeft = armLeftPivot;
+        group.userData.armRight = armRightPivot;
+    }
 
     scene.add(group);
     GAME_STATE.boss = group;
@@ -1799,7 +1887,11 @@ function startGame() {
     GAME_STATE.playerX = 0;
     playerZ = 0;
 
-    GAME_STATE.stickmen.forEach(s => scene.remove(s));
+    GAME_STATE.stickmen.forEach(s => {
+        scene.remove(s);
+        s.visible = false;
+        GAME_STATE.stickmanPool.push(s);
+    });
     GAME_STATE.stickmen = [];
 
     spawnCrowd(GAME_STATE.crowdCount);
@@ -1909,6 +2001,7 @@ function loadProgress() {
         GAME_STATE.incomeLevel = data.incomeLevel || 1;
         GAME_STATE.unlockedSkins = data.unlockedSkins || ['default'];
         GAME_STATE.currentSkinId = data.currentSkinId || 'default';
+        CONFIG.startCrowd = 1 + (GAME_STATE.startCrowdLevel - 1) * 10;
     }
 }
 
@@ -2006,24 +2099,45 @@ function setupInputHandlers() {
 // INIT
 // ============================================
 
+let initRetries = 0;
 function init() {
-    if (typeof THREE === 'undefined') { setTimeout(init, 100); return; }
-
-    loadProgress();
-    initScene();
-    setupInputHandlers();
-    updateHUD();
-    updateUpgradeUI();
-
-    setTimeout(() => {
-        const loadingScreen = document.getElementById('loading-screen');
-        if (loadingScreen) {
-            loadingScreen.style.opacity = '0';
-            setTimeout(() => loadingScreen.classList.add('hidden'), 500);
+    if (typeof THREE === 'undefined') {
+        initRetries++;
+        if (initRetries > 30) {
+            var loadingText = document.getElementById('loading-text');
+            if (loadingText) {
+                loadingText.innerHTML = 'ERROR LOADING GAME:<br><span style="font-size:14px;color:#FF1744;text-transform:none;font-family:monospace;white-space:pre-wrap;">Three.js library failed to load. Please check if three.min.js is in the project folder.</span>';
+            }
+            return;
         }
-    }, 1000);
+        console.warn('THREE is undefined. Retrying...');
+        setTimeout(init, 100);
+        return;
+    }
 
-    gameLoop();
+    try {
+        loadProgress();
+        initScene();
+        setupInputHandlers();
+        updateHUD();
+        updateUpgradeUI();
+
+        setTimeout(() => {
+            const loadingScreen = document.getElementById('loading-screen');
+            if (loadingScreen) {
+                loadingScreen.style.opacity = '0';
+                setTimeout(() => loadingScreen.classList.add('hidden'), 500);
+            }
+        }, 1000);
+
+        gameLoop();
+    } catch (e) {
+        console.error('Initialization error:', e);
+        var loadingText = document.getElementById('loading-text');
+        if (loadingText) {
+            loadingText.innerHTML = 'ERROR LOADING GAME:<br><span style="font-size:14px;color:#FF1744;text-transform:none;font-family:monospace;white-space:pre-wrap;">' + e.message + '</span>';
+        }
+    }
 }
 
 window.addEventListener('resize', () => {
